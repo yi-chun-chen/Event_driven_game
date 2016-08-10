@@ -6,10 +6,12 @@ type UAV_fire_extinguish
     n_uav::Int64 # number of the UAV
     n_fire::Int64 # number of the fire position
     t_fail # failure rate of each UAV
-    t_emit # rate to emit message
+    t_emit # rate to emit message, tuple: (emit for UAV1, emit for UAV2)
     l_fire # fire position of each fire
     r_fire # reward of puting down each fire
+    e_fire # rate for extinguishing fire, tuple: (one UAV, two UAV)
     horizon # horizon of the planning problem
+    horizon_plan # horizon for planning
 
 end
 
@@ -17,7 +19,18 @@ end
 
 function UAV_fire_extinguish()
 
-    return UAV_fire_extinguish(4,2,3,(0.01,0.01),0.5,(4,10,13),(1,2,3),6)
+    return UAV_fire_extinguish(
+    4,
+    2,
+    3,
+    (0.01,0.4), # fail rate
+    (1.0,1.0), # message receive rate
+    (4,7,13),   # fire position
+    (1,2,20),   # fire reward
+    ((0.9,0.9),(0.8,0.9),(0.7,0.9)), # fire extinguish rate
+    7, # horizon
+    7  # planning horizon
+    )
 end
 
 UAV_model = UAV_fire_extinguish()
@@ -201,30 +214,49 @@ function fire_has_on(lf,l1,l2)
 
 end
 
+function fire_has_uav_how_many(lf,l1,l2)
 
-# fire extinguish rate.
+    num = 0
 
-function fire_ex_combo_effect(lf,l1,l2)
+    if lf == l1
 
-    if lf == l1 == l2
-
-        return 0.9 # When there are two UAV on the top of fire, the rate is 0.8.
-
-    elseif lf == l1
-
-        return 0.9 # When there is on UAV on the top of fire, the rate is 0.2.
-
-    elseif lf == l2
-
-        return 0.9
-
-    else
-
-        return 0.0 # fire remains
+        num += 1
 
     end
 
+    if lf == l2
+
+        num += 1
+
+    end
+
+    return num
+
 end
+
+# fire extinguish rate.
+
+#function fire_ex_combo_effect(lf,l1,l2)
+
+#    if lf == l1 == l2
+
+#        return 0.9 # When there are two UAV on the top of fire, the rate is 0.8.
+
+#    elseif lf == l1
+
+#        return 0.9 # When there is on UAV on the top of fire, the rate is 0.2.
+
+#    elseif lf == l2
+
+#        return 0.9
+
+#    else
+
+#        return 0.0 # fire remains
+
+#    end
+
+#end
 
 
 # Transition model
@@ -281,15 +313,20 @@ function transition_model(
             (event_product,prob_product) = mix_distribution(event_product,prob_product,[1],[1.0])
 
 
-        else # fire existes
+        else # fire exists
 
             l_f = UAV_model.l_fire[i_fire]
             l_1 = cart_product[1]
             l_2 = cart_product[2]
 
-            if fire_has_on(l_f,l_1,l_2)
+            if fire_has_uav_how_many(l_f,l_1,l_2) == 1
 
-                rate_put_down = fire_ex_combo_effect(l_f,l_1,l_2)
+                rate_put_down = UAV_model.e_fire[i_fire][1]
+                (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1-rate_put_down])
+
+            elseif fire_has_uav_how_many(l_f,l_1,l_2) == 2
+
+                rate_put_down = UAV_model.e_fire[i_fire][2]
                 (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1-rate_put_down])
 
             else
