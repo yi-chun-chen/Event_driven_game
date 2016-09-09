@@ -1,5 +1,5 @@
-include("models.jl")
-include("method_genetic.jl")
+include("models_two.jl")
+include("method_two_genetic.jl")
 
 
 #######################################################
@@ -19,7 +19,7 @@ function simulate_trajectory_stochastic(current_state,SP1,SP2,UAV_model)
     action_seq_1 = Array(Int64,UAV_model.horizon)
     action_seq_2 = Array(Int64,UAV_model.horizon)
 
-    trajectory = Array(Int64,UAV_model.horizon,6)
+    trajectory = Array(Any,UAV_model.horizon,6)
 
 
     for t = 1 : UAV_model.horizon
@@ -71,8 +71,7 @@ function simulate_trajectory_stochastic(current_state,SP1,SP2,UAV_model)
         end
 
         # add reward
-        trajectory[t,6] = reward_model(current_state,next_state,UAV_model)
-
+        trajectory[t,6] = reward_model(current_state,next_state,UAV_model) #* 0.95^(t-1)
 
         # state to next state
         current_state = next_state
@@ -84,15 +83,39 @@ function simulate_trajectory_stochastic(current_state,SP1,SP2,UAV_model)
 
 end
 
-SP1 = Array(Any,UAV_model.horizon_plan)
-SP2 = Array(Any,UAV_model.horizon_plan)
+function average_reward(times,current_state,SP1,SP2,UAV_model)
 
-for tt = 1 : UAV_model.horizon_plan
-    SP1[tt] = 0.2 * ones(Float64,n_total_s,5)
-    SP2[tt] = 0.2 * ones(Float64,n_total_s,5)
+    sum_r = 0
+
+    for i = 1 : times
+
+        sum_r += sum(simulate_trajectory_stochastic(current_state,SP1,SP2,UAV_model)[:,6])
+
+    end
+
+    return sum_r / times
+
 end
 
-simulate_trajectory_stochastic((1,16,2,2,2),SP1,SP2,UAV_model)
+##############################################
+##### trajectory to cartesian coordinate #####
+##############################################
+
+function trajectory_in_cart(trajectory,UAV_model)
+
+    traj_cart = Array(Any,size(trajectory))
+
+    for i = 1 : length(trajectory[:,1])
+
+        traj_cart[i,1] = mapping_one_to_car[trajectory[i,1]]
+        traj_cart[i,2:6] = trajectory[i,2:6]
+
+    end
+
+    return traj_cart
+
+end
+
 
 ##################################################
 ## Cumulative reward after current time ##########
@@ -121,8 +144,8 @@ end
 
 function trajectory_be_seen_by_each_player(trajectory,UAV_model)
 
-    trajectory_1 = Array(Int64,length(trajectory[:,1]),4)
-    trajectory_2 = Array(Int64,length(trajectory[:,1]),4)
+    trajectory_1 = Array(Any,length(trajectory[:,1]),4)
+    trajectory_2 = Array(Any,length(trajectory[:,1]),4)
 
     for n_event = 1 : length(trajectory[:,1])
 
@@ -143,19 +166,12 @@ function trajectory_be_seen_by_each_player(trajectory,UAV_model)
 end
 
 #####################################
-##### From population to polict #####
+##### From population to policy #####
 #####################################
 
-function population_to_stochastic_policy(population_trajectory_for_player,UAV_model,elite_rate)
-
-
-    SP = Array(Any,UAV_model.horizon_plan)
+function population_to_stochastic_policy(population_trajectory_for_player,SP,UAV_model,elite_rate)
 
     for delay = 1: UAV_model.horizon_plan
-
-        # Initialize stochastic policy
-
-        SP[delay] = 0.2 * ones(Float64,n_total_s,5)
 
         # Count event and label the position of (state,delay,action)
 
@@ -190,7 +206,7 @@ function population_to_stochastic_policy(population_trajectory_for_player,UAV_mo
 
             # list of all information as an array
 
-            events_not_sort = Array(Int64,number_of_state,4)
+            events_not_sort = Array(Any,number_of_state,4)
 
             for n_event_of_state = 2 : number_of_state+1
 
@@ -252,7 +268,7 @@ traject_test_1 = [
     [2300  1  1  0];
     [2304  0  3  0]]
 
-ex_outcome = population_to_stochastic_policy(traject_test_1,UAV_model,0.2,1)
+#ex_outcome = population_to_stochastic_policy(traject_test_1,SP1,UAV_model,0.2)
 
 
 ######################################################
@@ -261,9 +277,9 @@ ex_outcome = population_to_stochastic_policy(traject_test_1,UAV_model,0.2,1)
 
 function generate_pool(n_trajectory,current_state,SP1,SP2,UAV_model)
 
-    pool_trajectory = Array(Int64,n_trajectory * UAV_model.horizon,6)
-    pool_trajectory_1 = Array(Int64,n_trajectory * UAV_model.horizon,4)
-    pool_trajectory_2 = Array(Int64,n_trajectory * UAV_model.horizon,4)
+    pool_trajectory = Array(Any,n_trajectory * UAV_model.horizon,6)
+    pool_trajectory_1 = Array(Any,n_trajectory * UAV_model.horizon,4)
+    pool_trajectory_2 = Array(Any,n_trajectory * UAV_model.horizon,4)
 
     for i_tra = 1 : n_trajectory
 
@@ -289,18 +305,17 @@ end
 ####### Cross entropy method ######
 ###################################
 
+SP1 = Array(Any,UAV_model.horizon_plan)
+SP2 = Array(Any,UAV_model.horizon_plan)
 
-function cross_entropy_times(times_iteration,n_trajectory,current_state,UAV_model,elite_rate)
+for tt = 1 : UAV_model.horizon_plan
+    SP1[tt] = 0.2 * ones(Float64,n_total_s,5)
+    SP2[tt] = 0.2 * ones(Float64,n_total_s,5)
+end
 
-    # Initialize stochastic policies
+SP = (SP1,SP2)
 
-    SP1 = Array(Any,UAV_model.horizon_plan)
-    SP2 = Array(Any,UAV_model.horizon_plan)
-
-    for tt = 1 : UAV_model.horizon_plan
-        SP1[tt] = 0.2 * ones(Float64,n_total_s,5)
-        SP2[tt] = 0.2 * ones(Float64,n_total_s,5)
-    end
+function cross_entropy_times(times_iteration,n_trajectory,current_state,SP1,SP2,UAV_model,elite_rate)
 
     pool_trajectory = generate_pool(n_trajectory,current_state,SP1,SP2,UAV_model)
 
@@ -308,24 +323,27 @@ function cross_entropy_times(times_iteration,n_trajectory,current_state,UAV_mode
     # cross entropy procedure
 
     for t_iteration = 1 : times_iteration
-
+        println("----------------------------------")
         println("times of iteration = ",t_iteration)
         test = simulate_trajectory_stochastic(current_state,SP1,SP2,UAV_model)
         println("test reward = ", sum(test[:,6]))
 
-        SP1 = population_to_stochastic_policy(pool_trajectory[1],UAV_model,elite_rate)
+        SP1 = population_to_stochastic_policy(pool_trajectory[1],SP1,UAV_model,elite_rate)
 
         pool_trajectory = generate_pool(n_trajectory,current_state,SP1,SP2,UAV_model)
 
-        SP1 = population_to_stochastic_policy(pool_trajectory[2],UAV_model,elite_rate)
+        SP2 = population_to_stochastic_policy(pool_trajectory[2],SP2,UAV_model,elite_rate)
 
         pool_trajectory = generate_pool(n_trajectory,current_state,SP1,SP2,UAV_model)
+
+        println("max in pool = ",maximum(pool_trajectory[1][:,4]))
 
     end
 
     return (SP1,SP2)
 end
 
-SP = cross_entropy_times(50,2000,(1,16,2,2,2),UAV_model,0.3);
+current_state = (1,25,2,2,2)
+SP = cross_entropy_times(30,5000,current_state,SP[1],SP[2],UAV_model,0.01); # 5000 0.15
 
-test = simulate_trajectory_stochastic((1,16,2,2,2),SP[1],SP[2],UAV_model)
+test = simulate_trajectory_stochastic(current_state,SP[1],SP[2],UAV_model);trajectory_in_cart(test,UAV_model)

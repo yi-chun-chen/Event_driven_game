@@ -1,4 +1,4 @@
-include("models.jl")
+include("models_two.jl")
 
 ###############################################
 ############### Sampling ######################
@@ -57,7 +57,7 @@ end
 
 h = UAV_model.horizon
 
-n_total_s = 17 * 17 * 8
+n_total_s = (n_w^2 + 1)^2 * 8
 
 
 function simulator_two_policy(
@@ -277,13 +277,13 @@ function genetic_process_two_uav(
     # Score for intial population for uav 1
     initial_score_u1 = Array(Float64,pop_size)
     for i = 1 : pop_size
-        initial_score_u1[i] = fitness_function(50,current_state,initial_pop_u1[i,:],policy_2_fixed,UAV_model)
+        initial_score_u1[i] = fitness_function(10,current_state,initial_pop_u1[i,:],policy_2_fixed,UAV_model)
     end
 
     # Score for intial population for uav 2
     initial_score_u2 = Array(Float64,pop_size)
     for i = 1 : pop_size
-        initial_score_u2[i] = fitness_function(50,current_state,policy_1_fixed,initial_pop_u2[i,:],UAV_model)
+        initial_score_u2[i] = fitness_function(10,current_state,policy_1_fixed,initial_pop_u2[i,:],UAV_model)
     end
 
     #####################################################
@@ -326,7 +326,7 @@ function genetic_process_two_uav(
         best_ind_2 = indmax(initial_score_u2)
         best_policy_u2 = initial_pop_u2[best_ind_2,:]
 
-        reward_by_best_two = fitness_function(20,current_state,best_policy_u1,best_policy_u2,UAV_model)
+        reward_by_best_two = fitness_function(10,current_state,best_policy_u1,best_policy_u2,UAV_model)
 
         if reward_by_best_two > best_score_current
             best_score_current = reward_by_best_two
@@ -370,7 +370,7 @@ function genetic_process_two_uav(
         # Prepare for new iteration for u1
         initial_pop_u1 = copy(new_pop_u1)
         for i = 1 : pop_size
-            initial_score_u1[i] = fitness_function(20,current_state,initial_pop_u1[i,:],best_policy_u2,UAV_model)
+            initial_score_u1[i] = fitness_function(10,current_state,initial_pop_u1[i,:],best_policy_u2,UAV_model)
         end
 
         total_score_u1 = sum(initial_score_u1)
@@ -413,7 +413,7 @@ function genetic_process_two_uav(
         # Prepare for new iteration for u2
         initial_pop_u2 = copy(new_pop_u2)
         for i = 1 : pop_size
-            initial_score_u2[i] = fitness_function(20,current_state,best_policy_u1,initial_pop_u2[i,:],UAV_model)
+            initial_score_u2[i] = fitness_function(10,current_state,best_policy_u1,initial_pop_u2[i,:],UAV_model)
         end
 
         total_score_u2 = sum(initial_score_u2)
@@ -429,3 +429,6 @@ function genetic_process_two_uav(
     return (best_score,best_p1_current,best_p2_current)
 
 end
+
+
+#x = genetic_process_two_uav( 500, 50, (1,25,2,2,2), UAV_model)

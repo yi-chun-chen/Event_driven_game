@@ -20,16 +20,16 @@ end
 function UAV_fire_extinguish()
 
     return UAV_fire_extinguish(
-    4,
+    5,
     2,
     3,
-    (0.01,0.4), # fail rate
-    (1.0,1.0), # message receive rate
-    (4,7,13),   # fire position
-    (1,2,20),   # fire reward
-    ((0.9,0.9),(0.8,0.9),(0.7,0.9)), # fire extinguish rate
-    7, # horizon
-    7  # planning horizon
+    (0.01,0.04), # fail rate
+    (0.4,0.4), # message receive rate
+    (5,9,21),   # fire position
+    (1,2,10),   # fire reward
+    ((1.0,0.9),(0.5,0.9),(0.0,0.9)), # fire extinguish rate
+    20, # horizon
+    5  # planning horizon
     )
 end
 
@@ -47,7 +47,7 @@ function one_d_to_two(x,n_w)
     x_1 = div(x-1,n_w) + 1
     x_2 = x % n_w
     if x_2 == 0
-        x_2 = 4
+        x_2 = n_w
     end
 
     return (x_2,x_1)
@@ -96,16 +96,11 @@ end
 
 # The environment is a 4 by 4 grid world, and there are two agents
 
-n_w = 4
+n_w = UAV_model.n_w
 n_grid = n_w^2
 
 n_a = 5
 
-# fire position
-
-l_f_1 = 3
-l_f_2 = 10
-l_f_3 = 13
 
 # Mapping between Cartesian product and integer through dictionary
 
@@ -151,8 +146,8 @@ function move_location(l::Int64,a::Int64,n_w::Int64)
                 x1_next = x1 + 1
                 x2_next = x2
 
-                if x1_next > 4
-                    x1_next = 4
+                if x1_next > n_w
+                    x1_next = n_w
                 end
 
         elseif a == 3 # left
@@ -178,8 +173,8 @@ function move_location(l::Int64,a::Int64,n_w::Int64)
                 x1_next = x1
                 x2_next = x2 + 1
 
-                if x2_next > 4
-                    x2_next = 4
+                if x2_next > n_w
+                    x2_next = n_w
                 end
 
         else
@@ -271,30 +266,32 @@ function transition_model(
     # transition of the locations
     # no uncertainty while moving
 
-    if cart_product[1] == 17
+    s_fail =  UAV_model.n_w^2 + 1
 
-        event_set_1 = [17]
+    if cart_product[1] == s_fail
+
+        event_set_1 = [s_fail]
         prob_set_1 = [1.0]
 
     else
 
     l1_next = move_location(cart_product[1],a1,UAV_model.n_w)
 
-    event_set_1 = [ l1_next, 17]
+    event_set_1 = [ l1_next, s_fail]
     prob_set_1 =  [ 1 - UAV_model.t_fail[1], UAV_model.t_fail[1]]
 
     end
 
     l2_next = move_location(cart_product[2],a2,UAV_model.n_w)
 
-    if cart_product[2] == 17
+    if cart_product[2] == s_fail
 
-        event_set_2 = [17]
+        event_set_2 = [s_fail]
         prob_set_2 = [1.0]
 
     else
 
-    event_set_2 = [ l2_next, 17]
+    event_set_2 = [ l2_next, s_fail]
     prob_set_2 =  [ 1 - UAV_model.t_fail[2], UAV_model.t_fail[2]]
 
     end
@@ -322,12 +319,12 @@ function transition_model(
             if fire_has_uav_how_many(l_f,l_1,l_2) == 1
 
                 rate_put_down = UAV_model.e_fire[i_fire][1]
-                (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1-rate_put_down])
+                (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1.0-rate_put_down])
 
             elseif fire_has_uav_how_many(l_f,l_1,l_2) == 2
 
                 rate_put_down = UAV_model.e_fire[i_fire][2]
-                (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1-rate_put_down])
+                (event_product,prob_product) = mix_distribution(event_product,prob_product,[1,2],[rate_put_down,1.0-rate_put_down])
 
             else
 
