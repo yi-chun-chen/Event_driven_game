@@ -1,6 +1,9 @@
 import tensorflow as tf
 import numpy as np
 import random
+import time
+
+start_time = time.time()
 
 class UAV_fire_extinguish(object):
 
@@ -8,7 +11,7 @@ class UAV_fire_extinguish(object):
   n_uav = 2
   n_fire = 3
   u_loca = (0,15)
-  t_fail = (0.05,0.05)
+  t_fail = (0.00,0.00)
   t_emit = (0.5,0.5)
   l_fire = (3,6,12)
   r_fire = (2.0,1.0,10.0)
@@ -395,7 +398,9 @@ def batch_select(inputs,n_batch):
 
   return batch_set
 
-def visualize_scenario_one(initial_state,h_print,r_explore,UAV_fire_extinguish):
+##### Sequential test #####
+
+def visualize_scenario(initial_state,h_print,r_explore,UAV_fire_extinguish):
 
   (x0,y0) = one_dim_to_two(initial_state[0],UAV_fire_extinguish.n_w)
   (x1,y1) = one_dim_to_two(initial_state[1],UAV_fire_extinguish.n_w)
@@ -408,8 +413,8 @@ def visualize_scenario_one(initial_state,h_print,r_explore,UAV_fire_extinguish):
   print(current_state)
 
   for h in range(h_print):
-    action_chosen_1 = random.randint(0,4)
     action_chosen_0 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_0]}),r_explore)
+    action_chosen_1 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_1]}),r_explore)
 
     outcome_transition = transition_sample(current_state,
                                            (action_chosen_0,action_chosen_1),
@@ -458,10 +463,10 @@ b1_train = tf.placeholder(tf.float32,[1,n_hidd])
 W2_train = tf.placeholder(tf.float32,[n_hidd,5])
 b2_train = tf.placeholder(tf.float32,[1,5])
 
-#W1_fixed = tf.placeholder(tf.float32,[9,n_hidd])
-#b1_fixed = tf.placeholder(tf.float32,[1,n_hidd])
-#W2_fixed = tf.placeholder(tf.float32,[n_hidd,5])
-#b2_fixed = tf.placeholder(tf.float32,[1,5])
+W1_fixed = tf.placeholder(tf.float32,[9,n_hidd])
+b1_fixed = tf.placeholder(tf.float32,[1,n_hidd])
+W2_fixed = tf.placeholder(tf.float32,[n_hidd,5])
+b2_fixed = tf.placeholder(tf.float32,[1,5])
 
 ##### Layers #####
 
@@ -472,10 +477,13 @@ Q = layer_out[0]
 layer_c1 = copy_layer(next_info,W1_train,b1_train,activation_function = tf.nn.relu)
 Q_next = copy_layer(layer_c1,W2_train,b2_train,activation_function = None)
 
+layer_c2 = copy_layer(last_info,W1_fixed,b1_fixed,activation_function = tf.nn.relu)
+Q_fixed = copy_layer(layer_c2,W2_fixed,b2_fixed,activation_function = None)
+
 ### Loss function ###
 best_next_state_action = tf.reduce_max(Q_next,reduction_indices=[1],keep_dims=True)
 current_state_action = tf.reduce_sum(tf.mul(Q,actions),reduction_indices=[1],keep_dims=True)
-loss = tf.reduce_mean(tf.square(rewards + 0.99 * best_next_state_action - current_state_action))
+loss = tf.reduce_mean(tf.square(rewards + 0.90 * best_next_state_action - current_state_action))
 
 ### train ###
 train_step = tf.train.AdamOptimizer(0.001).minimize(loss)
@@ -496,6 +504,11 @@ b1_for_feed_train = np.ones((1,n_hidd),float)
 W2_for_feed_train = np.ones((n_hidd,5),float)
 b2_for_feed_train = np.ones((1,5),float)
 
+W1_for_feed_fixed = np.ones((9,n_hidd),float)
+b1_for_feed_fixed = np.ones((1,n_hidd),float)
+W2_for_feed_fixed = np.ones((n_hidd,5),float)
+b2_for_feed_fixed = np.ones((1,5),float)
+
 ### batch ###
 n_batch_size = 1000
 s0_batch = batch_select(s0_array,n_batch_size)
@@ -508,85 +521,236 @@ r1_batch = batch_select(r1_array,n_batch_size)
 a1_batch = batch_select(a1_array,n_batch_size)
 sp1_batch = batch_select(sp1_array,n_batch_size)
 
-for h in range(2000):
+h_train_step = 1000
+h_grad = 100
+r_explore = 0.2
+
+for iteration_times in range(3):
+  print("iteration times = ", iteration_times)
+  print("--- %s seconds ---" % (time.time() - start_time))
 
   ##############################
   ###### Only for agent 1 ######
   ##############################
-  numeric_loss = 0.0
-  for i in range(100):
-    # training
-    numeric_loss, _ = sess.run([loss,train_step],
-                               feed_dict={last_info: s0_batch,
-                                          rewards: r0_batch,
-                                          next_info:sp0_batch,
-                                          actions: a0_batch,
-                                          W1_train:W1_for_feed_train,
-                                          b1_train:b1_for_feed_train,
-                                          W2_train:W2_for_feed_train,
-                                          b2_train:b2_for_feed_train})
 
-  print(numeric_loss)
+  for h in range(h_train_step):
 
+    numeric_loss = 0.0
 
-  # Choose action
-  action_chosen_0 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_0]}),0.1)
-  action_chosen_1 = random.randint(0,4)
-  outcome_transition = transition_sample(current_state,
-                                         (action_chosen_0,action_chosen_1),
-                                         last_info_0,
-                                         last_info_1,
-                                         UAV_fire_extinguish)
+    ##### training the NN #####
+    for i in range(h_grad):
 
-  next_state = outcome_transition[0]
-  (next_info_0,reward_immed) = outcome_transition[1]
-  (next_info_1,reward_immed) = outcome_transition[2]
-
-  print('(current_state)= ',current_state)
-  print('(joint action )= ',(action_chosen_0,action_chosen_1))
-  print('(next state   )= ',next_state)
-
-  s0_array = np.vstack([s0_array, last_info_0])
-  sp0_array = np.vstack([sp0_array, next_info_0])
-  r0_array = np.vstack([r0_array, reward_immed])
-
-  action_new = np.zeros((1,5),float)
-  action_new[0,action_chosen_0] = 1.0
-  a0_array = np.vstack([a0_array, action_new])
-
-  if h%100 == 0:
-    W1_for_feed_train = sess.run(layer_1[1], feed_dict={last_info: [last_info_0]})
-    b1_for_feed_train = sess.run(layer_1[2], feed_dict={last_info: [last_info_0]})
-    W2_for_feed_train = sess.run(layer_out[1], feed_dict={last_info: [last_info_0]})
-    b2_for_feed_train = sess.run(layer_out[2], feed_dict={last_info: [last_info_0]})
-
-  current_state = next_state
-  last_info_0 = next_info_0
-  last_info_1 = next_info_1
+      numeric_loss, _ = sess.run([loss,train_step],feed_dict={last_info: s0_batch,
+                                                              rewards: r0_batch,
+                                                              next_info:sp0_batch,
+                                                              actions: a0_batch,
+                                                              W1_train:W1_for_feed_train,
+                                                              b1_train:b1_for_feed_train,
+                                                              W2_train:W2_for_feed_train,
+                                                              b2_train:b2_for_feed_train})
+    print(numeric_loss)
 
 
-  # truncate the size of data samples
-  s0_array = truncate_dataset(s0_array,n_init_pool)
-  r0_array = truncate_dataset(r0_array,n_init_pool)
-  a0_array = truncate_dataset(a0_array,n_init_pool)
-  sp0_array = truncate_dataset(sp0_array,n_init_pool)
+    ##### Choose action #####
 
-  s1_array = truncate_dataset(s1_array,n_init_pool)
-  r1_array = truncate_dataset(r1_array,n_init_pool)
-  a1_array = truncate_dataset(a1_array,n_init_pool)
-  sp1_array = truncate_dataset(sp1_array,n_init_pool)
+    # action for agent 0 is chosen from the current NN
+    # action for agent 1 is chosen randomly in the first iteration,
+    # otherwise it is learned from previous network
+
+    action_chosen_0 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_0]}),r_explore)
+    if iteration_times == 0:
+      action_chosen_1 = random.randint(0,4)
+    else:
+      action_chosen_1 = es_greedy(sess.run(Q_fixed, feed_dict={last_info: [last_info_1],
+                                                               W1_fixed: W1_for_feed_fixed,
+                                                               b1_fixed: b1_for_feed_fixed,
+                                                               W2_fixed: W2_for_feed_fixed,
+                                                               b2_fixed: b2_for_feed_fixed}),r_explore)
+
+    ##### sample the transition #####
+    outcome_transition = transition_sample(current_state,
+                                           (action_chosen_0,action_chosen_1),
+                                           last_info_0,
+                                           last_info_1,
+                                           UAV_fire_extinguish)
+
+    next_state = outcome_transition[0]
+    (next_info_0,reward_immed) = outcome_transition[1]
+    (next_info_1,reward_immed) = outcome_transition[2]
+    print('(iter_t, h    )= ',(iteration_times,h))
+    #print('(current_state)= ',current_state)
+    #print('(joint action )= ',(action_chosen_0,action_chosen_1))
+    #print('(next state   )= ',next_state)
+
+    ##### increase sample dataset #####
+
+    s0_array = np.vstack([s0_array, last_info_0])
+    sp0_array = np.vstack([sp0_array, next_info_0])
+    r0_array = np.vstack([r0_array, reward_immed])
+
+    s1_array = np.vstack([s1_array, last_info_1])
+    sp1_array = np.vstack([sp1_array, next_info_1])
+    r1_array = np.vstack([r1_array, reward_immed])
+
+    action_new_0 = np.zeros((1,5),float)
+    action_new_0[0,action_chosen_0] = 1.0
+    a0_array = np.vstack([a0_array, action_new_0])
+
+    action_new_1 = np.zeros((1,5),float)
+    action_new_1[0,action_chosen_1] = 1.0
+    a1_array = np.vstack([a1_array, action_new_1])
+
+    ##### update the train network #####
+
+    if h%100 == 0:
+      W1_for_feed_train = sess.run(layer_1[1], feed_dict={last_info: [last_info_0]})
+      b1_for_feed_train = sess.run(layer_1[2], feed_dict={last_info: [last_info_0]})
+      W2_for_feed_train = sess.run(layer_out[1], feed_dict={last_info: [last_info_0]})
+      b2_for_feed_train = sess.run(layer_out[2], feed_dict={last_info: [last_info_0]})
+
+    current_state = next_state
+    last_info_0 = next_info_0
+    last_info_1 = next_info_1
+
+    # truncate the size of data samples
+    s0_array = truncate_dataset(s0_array,n_init_pool)
+    r0_array = truncate_dataset(r0_array,n_init_pool)
+    a0_array = truncate_dataset(a0_array,n_init_pool)
+    sp0_array = truncate_dataset(sp0_array,n_init_pool)
+
+    s1_array = truncate_dataset(s1_array,n_init_pool)
+    r1_array = truncate_dataset(r1_array,n_init_pool)
+    a1_array = truncate_dataset(a1_array,n_init_pool)
+    sp1_array = truncate_dataset(sp1_array,n_init_pool)
 
 
-  # re-sample the batch set
-  s0_batch = batch_select(s0_array,n_batch_size)
-  r0_batch = batch_select(r0_array,n_batch_size)
-  a0_batch = batch_select(a0_array,n_batch_size)
-  sp0_batch = batch_select(sp0_array,n_batch_size)
+    # re-sample the batch set
+    s0_batch = batch_select(s0_array,n_batch_size)
+    r0_batch = batch_select(r0_array,n_batch_size)
+    a0_batch = batch_select(a0_array,n_batch_size)
+    sp0_batch = batch_select(sp0_array,n_batch_size)
 
-  s1_batch = batch_select(s1_array,n_batch_size)
-  r1_batch = batch_select(r1_array,n_batch_size)
-  a1_batch = batch_select(a1_array,n_batch_size)
-  sp1_batch = batch_select(sp1_array,n_batch_size)
+    s1_batch = batch_select(s1_array,n_batch_size)
+    r1_batch = batch_select(r1_array,n_batch_size)
+    a1_batch = batch_select(a1_array,n_batch_size)
+    sp1_batch = batch_select(sp1_array,n_batch_size)
+
+  #############################################
+  ##### Done the training for the agent 0 #####
+  #############################################
+
+  default_info = [-1,0,0,3,3,1,1,1,1]
+
+  ##### Update the fixed network #####
+  W1_for_fixed = sess.run(layer_1[1], feed_dict={last_info: [default_info]})
+  b1_for_fixed = sess.run(layer_1[2], feed_dict={last_info: [default_info]})
+  W2_for_fixed = sess.run(layer_out[1], feed_dict={last_info: [default_info]})
+  b2_for_fixed = sess.run(layer_out[2], feed_dict={last_info: [default_info]})
+
+  #####################################
+  ##### Training only for agent 1 #####
+  #####################################
+
+  for h in range(h_train_step):
+
+    numeric_loss = 0.0
+
+    ##### training the NN #####
+    for i in range(h_grad):
+
+      numeric_loss, _ = sess.run([loss,train_step],feed_dict={last_info: s1_batch,
+                                                              rewards: r1_batch,
+                                                              next_info:sp1_batch,
+                                                              actions: a1_batch,
+                                                              W1_train:W1_for_feed_train,
+                                                              b1_train:b1_for_feed_train,
+                                                              W2_train:W2_for_feed_train,
+                                                              b2_train:b2_for_feed_train})
+    print(numeric_loss)
+
+
+    ##### Choose action #####
+
+    # action for agent 1 is chosen from the current NN
+    # action for agent 0 is chosen from the previous network
+
+    action_chosen_1 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_1]}),r_explore)
+
+    action_chosen_0 = es_greedy(sess.run(Q_fixed, feed_dict={last_info: [last_info_0],
+                                                               W1_fixed: W1_for_feed_fixed,
+                                                               b1_fixed: b1_for_feed_fixed,
+                                                               W2_fixed: W2_for_feed_fixed,
+                                                               b2_fixed: b2_for_feed_fixed}),r_explore)
+
+    ##### sample the transition #####
+    outcome_transition = transition_sample(current_state,
+                                           (action_chosen_0,action_chosen_1),
+                                           last_info_0,
+                                           last_info_1,
+                                           UAV_fire_extinguish)
+
+    next_state = outcome_transition[0]
+    (next_info_0,reward_immed) = outcome_transition[1]
+    (next_info_1,reward_immed) = outcome_transition[2]
+
+    print('(iter_t, h    )= ',(iteration_times,h))
+    #print('(current_state)= ',current_state)
+    #print('(joint action )= ',(action_chosen_0,action_chosen_1))
+    #print('(next state   )= ',next_state)
+
+    ##### increase sample dataset #####
+
+    s0_array = np.vstack([s0_array, last_info_0])
+    sp0_array = np.vstack([sp0_array, next_info_0])
+    r0_array = np.vstack([r0_array, reward_immed])
+
+    s1_array = np.vstack([s1_array, last_info_1])
+    sp1_array = np.vstack([sp1_array, next_info_1])
+    r1_array = np.vstack([r1_array, reward_immed])
+
+    action_new_0 = np.zeros((1,5),float)
+    action_new_0[0,action_chosen_0] = 1.0
+    a0_array = np.vstack([a0_array, action_new_0])
+
+    action_new_1 = np.zeros((1,5),float)
+    action_new_1[0,action_chosen_1] = 1.0
+    a1_array = np.vstack([a1_array, action_new_1])
+
+    ##### update the train network #####
+
+    if h%100 == 0:
+      W1_for_feed_train = sess.run(layer_1[1], feed_dict={last_info: [last_info_1]})
+      b1_for_feed_train = sess.run(layer_1[2], feed_dict={last_info: [last_info_1]})
+      W2_for_feed_train = sess.run(layer_out[1], feed_dict={last_info: [last_info_1]})
+      b2_for_feed_train = sess.run(layer_out[2], feed_dict={last_info: [last_info_1]})
+
+    current_state = next_state
+    last_info_0 = next_info_0
+    last_info_1 = next_info_1
+
+    # truncate the size of data samples
+    s0_array = truncate_dataset(s0_array,n_init_pool)
+    r0_array = truncate_dataset(r0_array,n_init_pool)
+    a0_array = truncate_dataset(a0_array,n_init_pool)
+    sp0_array = truncate_dataset(sp0_array,n_init_pool)
+
+    s1_array = truncate_dataset(s1_array,n_init_pool)
+    r1_array = truncate_dataset(r1_array,n_init_pool)
+    a1_array = truncate_dataset(a1_array,n_init_pool)
+    sp1_array = truncate_dataset(sp1_array,n_init_pool)
+
+
+    # re-sample the batch set
+    s0_batch = batch_select(s0_array,n_batch_size)
+    r0_batch = batch_select(r0_array,n_batch_size)
+    a0_batch = batch_select(a0_array,n_batch_size)
+    sp0_batch = batch_select(sp0_array,n_batch_size)
+
+    s1_batch = batch_select(s1_array,n_batch_size)
+    r1_batch = batch_select(r1_array,n_batch_size)
+    a1_batch = batch_select(a1_array,n_batch_size)
+    sp1_batch = batch_select(sp1_array,n_batch_size)
 
 
 
+#visualize_scenario([0,15,1,1,1],100,UAV_fire_extinguish)

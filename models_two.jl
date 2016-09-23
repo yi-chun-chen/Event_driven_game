@@ -20,14 +20,14 @@ end
 function UAV_fire_extinguish()
 
     return UAV_fire_extinguish(
-    5,
+    4,
     2,
     3,
-    (0.01,0.04), # fail rate
-    (0.4,0.4), # message receive rate
-    (5,9,21),   # fire position
-    (1,2,10),   # fire reward
-    ((1.0,0.9),(0.5,0.9),(0.0,0.9)), # fire extinguish rate
+    (0.00,0.00), # fail rate
+    (0.5,0.5), # message receive rate
+    (7,4,13),   # fire position
+    (2,1,10),   # fire reward
+    ((0.5,0.9),(0.9,0.9),(0.1,0.9)), # fire extinguish rate
     20, # horizon
     5  # planning horizon
     )
