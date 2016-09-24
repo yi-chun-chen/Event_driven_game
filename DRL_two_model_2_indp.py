@@ -11,11 +11,11 @@ class UAV_fire_extinguish(object):
   n_uav = 2
   n_fire = 3
   u_loca = (0,15)
-  t_fail = (0.04,0.04)
-  t_emit = (1.0,1.0)
+  t_fail = (0.01,0.05)
+  t_emit = (0.5,0.5)
   l_fire = (3,6,12)
-  r_fire = (2.0,1.0,10.0)
-  e_fire = ((0.5,0.9),(0.9,0.9),(0.1,0.9))
+  r_fire = (2.0,1.0,20.0)
+  e_fire = ((0.5,0.9),(0.9,0.9),(0.01,0.9))
   horizon = 20
   horizon = 5
 
@@ -387,10 +387,7 @@ def es_greedy(inputs,epsi):
   else:
     return np.argmax(inputs)
 
-def batch_select(inputs,n_batch):
-
-  n_total = len(inputs)
-  seeds = random.sample(xrange(1,n_total),n_batch)
+def batch_select(inputs,n_total,n_batch,seeds):
 
   batch_set = np.zeros((n_batch,len(inputs[0])))
   for i in range(n_batch):
@@ -498,7 +495,7 @@ Q_next_a1 = copy_layer(layer_c1_a1, W2_train_a1, b2_train_a1, activation_functio
 ### Loss function for Agent 0 ###
 best_next_state_action_a0 = tf.reduce_max(Q_next_a0,reduction_indices=[1],keep_dims=True)
 current_state_action_a0 = tf.reduce_sum(tf.mul(Q_a0,actions_a0),reduction_indices=[1],keep_dims=True)
-loss_a0 = tf.reduce_mean(tf.square(rewards_a0 + 0.99 * best_next_state_action_a0 - current_state_action_a0))
+loss_a0 = tf.reduce_mean(tf.square(rewards_a0 + 0.95 * best_next_state_action_a0 - current_state_action_a0))
 
 ### train for the loss function of Agent0 ###
 train_step_a0 = tf.train.AdamOptimizer(0.001).minimize(loss_a0)
@@ -506,7 +503,7 @@ train_step_a0 = tf.train.AdamOptimizer(0.001).minimize(loss_a0)
 ### Loss function for Agent 1 ###
 best_next_state_action_a1 = tf.reduce_max(Q_next_a1,reduction_indices=[1],keep_dims=True)
 current_state_action_a1 = tf.reduce_sum(tf.mul(Q_a1,actions_a1),reduction_indices=[1],keep_dims=True)
-loss_a1 = tf.reduce_mean(tf.square(rewards_a1 + 0.99 * best_next_state_action_a1 - current_state_action_a1))
+loss_a1 = tf.reduce_mean(tf.square(rewards_a1 + 0.95 * best_next_state_action_a1 - current_state_action_a1))
 
 ### train for the loss function of Agent1 ###
 train_step_a1 = tf.train.AdamOptimizer(0.001).minimize(loss_a1)
@@ -534,22 +531,27 @@ b2_for_feed_train_a1 = np.ones((1,5),float)
 
 
 ### batch ###
+
 n_batch_size = 5000
-s0_batch = batch_select(s0_array,n_batch_size)
-r0_batch = batch_select(r0_array,n_batch_size)
-a0_batch = batch_select(a0_array,n_batch_size)
-sp0_batch = batch_select(sp0_array,n_batch_size)
 
-s1_batch = batch_select(s1_array,n_batch_size)
-r1_batch = batch_select(r1_array,n_batch_size)
-a1_batch = batch_select(a1_array,n_batch_size)
-sp1_batch = batch_select(sp1_array,n_batch_size)
+seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
 
-h_train_step = 1000
+s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
+r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
+a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
+sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
+
+s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
+r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
+a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
+sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
+
+
+h_train_step = 500
 h_grad = 100
 r_explore = 0.2
 
-for iteration_times in range(5):
+for iteration_times in range(15):
   print("iteration times = ", iteration_times)
   print("--- %s seconds ---" % (time.time() - start_time))
 
@@ -645,15 +647,19 @@ for iteration_times in range(5):
 
 
     # re-sample the batch set
-    s0_batch = batch_select(s0_array,n_batch_size)
-    r0_batch = batch_select(r0_array,n_batch_size)
-    a0_batch = batch_select(a0_array,n_batch_size)
-    sp0_batch = batch_select(sp0_array,n_batch_size)
 
-    s1_batch = batch_select(s1_array,n_batch_size)
-    r1_batch = batch_select(r1_array,n_batch_size)
-    a1_batch = batch_select(a1_array,n_batch_size)
-    sp1_batch = batch_select(sp1_array,n_batch_size)
+    seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
+
+    s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
+    r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
+    a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
+    sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
+
+    s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
+    r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
+    a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
+    sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
+
 
   #############################################
   ##### Done the training for the agent 0 #####
@@ -750,16 +756,18 @@ for iteration_times in range(5):
 
 
     # re-sample the batch set
-    s0_batch = batch_select(s0_array,n_batch_size)
-    r0_batch = batch_select(r0_array,n_batch_size)
-    a0_batch = batch_select(a0_array,n_batch_size)
-    sp0_batch = batch_select(sp0_array,n_batch_size)
+    seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
 
-    s1_batch = batch_select(s1_array,n_batch_size)
-    r1_batch = batch_select(r1_array,n_batch_size)
-    a1_batch = batch_select(a1_array,n_batch_size)
-    sp1_batch = batch_select(sp1_array,n_batch_size)
+    s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
+    r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
+    a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
+    sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
+
+    s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
+    r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
+    a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
+    sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
 
 
-
+print("--- %s seconds ---" % (time.time() - start_time))
 #visualize_scenario([0,15,1,1,1],100,UAV_fire_extinguish)
