@@ -11,10 +11,10 @@ class UAV_fire_extinguish(object):
   n_uav = 2
   n_fire = 3
   u_loca = (0,15)
-  t_fail = (0.01,0.04)
-  t_emit = (0.8,0.8)
+  t_fail = (0.00,0.00)
+  t_emit = (0.5,0.5)
   l_fire = (3,6,12)
-  r_fire = (2.0,1.0,20.0)
+  r_fire = (2.0,1.0,10.0)
   e_fire = ((0.5,0.9),(0.9,0.9),(0.1,0.9))
   horizon = 20
   horizon = 5
@@ -436,7 +436,7 @@ def visualize_scenario_indp(initial_state,h_print,r_explore,UAV_fire_extinguish)
 ##### Create initial population of samples #####
 
 n_hidd = 50
-n_init_pool = 50000
+n_init_pool = 5
 
 outcome = samples_by_random_action(n_init_pool,[0,15,1,1,1],UAV_fire_extinguish)
 
@@ -498,7 +498,7 @@ Q_next_a1 = copy_layer(layer_c1_a1, W2_train_a1, b2_train_a1, activation_functio
 ### Loss function for Agent 0 ###
 best_next_state_action_a0 = tf.reduce_max(Q_next_a0,reduction_indices=[1],keep_dims=True)
 current_state_action_a0 = tf.reduce_sum(tf.mul(Q_a0,actions_a0),reduction_indices=[1],keep_dims=True)
-loss_a0 = tf.reduce_mean(tf.square(rewards_a0 + 0.95 * best_next_state_action_a0 - current_state_action_a0))
+loss_a0 = tf.reduce_mean(tf.square(rewards_a0 + 0.99 * best_next_state_action_a0 - current_state_action_a0))
 
 ### train for the loss function of Agent0 ###
 train_step_a0 = tf.train.AdamOptimizer(0.001).minimize(loss_a0)
@@ -506,7 +506,7 @@ train_step_a0 = tf.train.AdamOptimizer(0.001).minimize(loss_a0)
 ### Loss function for Agent 1 ###
 best_next_state_action_a1 = tf.reduce_max(Q_next_a1,reduction_indices=[1],keep_dims=True)
 current_state_action_a1 = tf.reduce_sum(tf.mul(Q_a1,actions_a1),reduction_indices=[1],keep_dims=True)
-loss_a1 = tf.reduce_mean(tf.square(rewards_a1 + 0.95 * best_next_state_action_a1 - current_state_action_a1))
+loss_a1 = tf.reduce_mean(tf.square(rewards_a1 + 0.99 * best_next_state_action_a1 - current_state_action_a1))
 
 ### train for the loss function of Agent1 ###
 train_step_a1 = tf.train.AdamOptimizer(0.001).minimize(loss_a1)
@@ -533,50 +533,54 @@ W2_for_feed_train_a1 = np.ones((n_hidd,5),float)
 b2_for_feed_train_a1 = np.ones((1,5),float)
 
 
-### batch ###
 
-n_batch_size = 5000
-
-seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
-
-s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
-r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
-a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
-sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
-
-s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
-r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
-a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
-sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
-
-
-h_train_step = 1000
+h_train_step = 2000
 h_grad = 100
-r_explore = 0.4
+r_explore = 0.2
 
 for iteration_times in range(15):
   print("iteration times = ", iteration_times)
   print("--- %s seconds ---" % (time.time() - start_time))
+
   ##############################
   ###### Only for agent 1 ######
   ##############################
 
   for h in range(h_train_step):
 
+    current_state = [0,15,1,1,1]
+    next_state = 0
+    last_info_0 = [0,0,3,3,1,1,1,1]
+    last_info_1 = [0,0,3,3,1,1,1,1]
+
+    outcome = samples_by_random_action(2000,[0,15,1,1,1],UAV_fire_extinguish)
+
+    s0_array = outcome[0][0]
+    a0_array = outcome[0][1]
+    r0_array = outcome[0][2]
+    sp0_array = outcome[0][3]
+
+    s1_array = outcome[1][0]
+    a1_array = outcome[1][1]
+    r1_array = outcome[1][2]
+    sp1_array = outcome[1][3]
+
+
+
     numeric_loss_a0 = 0.0
 
     ##### training the NN #####
     for i in range(h_grad):
 
-      numeric_loss_a0, _ = sess.run([loss_a0,train_step_a0],feed_dict={last_info_a0: s0_batch,
-                                                                       rewards_a0: r0_batch,
-                                                                       next_info_a0:sp0_batch,
-                                                                       actions_a0: a0_batch,
+      numeric_loss_a0, _ = sess.run([loss_a0,train_step_a0],feed_dict={last_info_a0: s0_array,
+                                                                       rewards_a0: r0_array,
+                                                                       next_info_a0:sp0_array,
+                                                                       actions_a0: a0_array,
                                                                        W1_train_a0: W1_for_feed_train_a0,
                                                                        b1_train_a0: b1_for_feed_train_a0,
                                                                        W2_train_a0: W2_for_feed_train_a0,
                                                                        b2_train_a0: b2_for_feed_train_a0})
-    #print(numeric_loss_a0)
+
 
 
     ##### Choose action #####
@@ -601,7 +605,7 @@ for iteration_times in range(15):
     next_state = outcome_transition[0]
     (next_info_0,reward_immed) = outcome_transition[1]
     (next_info_1,reward_immed) = outcome_transition[2]
-    if h%50 == 0: print(numeric_loss_a0)
+    if h%10 == 0: print('(iter_t, h,loss)= ',(iteration_times,h,numeric_loss_a0))
     #print('(current_state)= ',current_state)
     #print('(joint action )= ',(action_chosen_0,action_chosen_1))
     #print('(next state   )= ',next_state)
@@ -648,21 +652,6 @@ for iteration_times in range(15):
     sp1_array = truncate_dataset(sp1_array,n_init_pool)
 
 
-    # re-sample the batch set
-
-    seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
-
-    s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
-    r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
-    a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
-    sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
-
-    s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
-    r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
-    a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
-    sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
-
-
   #############################################
   ##### Done the training for the agent 0 #####
   #############################################
@@ -676,17 +665,36 @@ for iteration_times in range(15):
 
     numeric_loss_a1 = 0.0
 
+    current_state = [0,15,1,1,1]
+    next_state = 0
+    last_info_0 = [0,0,3,3,1,1,1,1]
+    last_info_1 = [0,0,3,3,1,1,1,1]
+
+    outcome = samples_by_random_action(10,[0,15,1,1,1],UAV_fire_extinguish)
+
+    s0_array = outcome[0][0]
+    a0_array = outcome[0][1]
+    r0_array = outcome[0][2]
+    sp0_array = outcome[0][3]
+
+    s1_array = outcome[1][0]
+    a1_array = outcome[1][1]
+    r1_array = outcome[1][2]
+    sp1_array = outcome[1][3]
+
     ##### training the NN #####
     for i in range(h_grad):
 
-      numeric_loss_a1, _ = sess.run([loss_a1,train_step_a1],feed_dict={last_info_a1: s1_batch,
-                                                                       rewards_a1: r1_batch,
-                                                                       next_info_a1: sp1_batch,
-                                                                       actions_a1: a1_batch,
+      numeric_loss_a1, _ = sess.run([loss_a1,train_step_a1],feed_dict={last_info_a1: s1_array,
+                                                                       rewards_a1: r1_array,
+                                                                       next_info_a1: sp1_array,
+                                                                       actions_a1: a1_array,
                                                                        W1_train_a1: W1_for_feed_train_a1,
                                                                        b1_train_a1: b1_for_feed_train_a1,
                                                                        W2_train_a1: W2_for_feed_train_a1,
                                                                        b2_train_a1: b2_for_feed_train_a1})
+
+
 
     ##### Choose action #####
 
@@ -708,7 +716,7 @@ for iteration_times in range(15):
     (next_info_0,reward_immed) = outcome_transition[1]
     (next_info_1,reward_immed) = outcome_transition[2]
 
-    if h%50 == 0: print(numeric_loss_a1)
+    if h%10 == 0: print('(iter_t, h,loss)= ',(iteration_times,h,numeric_loss_a1))
     #print('(current_state)= ',current_state)
     #print('(joint action )= ',(action_chosen_0,action_chosen_1))
     #print('(next state   )= ',next_state)
@@ -753,20 +761,6 @@ for iteration_times in range(15):
     r1_array = truncate_dataset(r1_array,n_init_pool)
     a1_array = truncate_dataset(a1_array,n_init_pool)
     sp1_array = truncate_dataset(sp1_array,n_init_pool)
-
-
-    # re-sample the batch set
-    seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
-
-    s0_batch = batch_select(s0_array,n_init_pool,n_batch_size,seeds)
-    r0_batch = batch_select(r0_array,n_init_pool,n_batch_size,seeds)
-    a0_batch = batch_select(a0_array,n_init_pool,n_batch_size,seeds)
-    sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
-
-    s1_batch = batch_select(s1_array,n_init_pool,n_batch_size,seeds)
-    r1_batch = batch_select(r1_array,n_init_pool,n_batch_size,seeds)
-    a1_batch = batch_select(a1_array,n_init_pool,n_batch_size,seeds)
-    sp1_batch = batch_select(sp1_array,n_init_pool,n_batch_size,seeds)
 
 
 print("--- %s seconds ---" % (time.time() - start_time))
