@@ -11,11 +11,11 @@ class UAV_fire_extinguish(object):
   n_uav = 2
   n_fire = 3
   u_loca = (0,15)
-  t_fail = (0.02,0.05)
+  t_fail = (0.05,0.05)
   t_emit = (0.7,0.7)
   l_fire = (3,6,12)
   r_fire = (2.0,1.0,10.0)
-  e_fire = ((0.5,0.9),(0.9,0.9),(0.3,0.9))
+  e_fire = [[0.5,0.9],[0.9,0.9],[0.05,0.9]]
   horizon = 20
   horizon = 5
 
@@ -72,8 +72,6 @@ n_grid = n_w * n_w
 ##### Mapping between states #####
 ##################################
 
-###
-
 def two_dim_to_one(l_cor,n_w):
 
   x = l_cor[0]
@@ -90,7 +88,6 @@ def one_dim_to_two(l,n_w):
 
   return (x,y)
 
-###
 
 ############################
 ##### TRANSITION MODEL #####
@@ -437,7 +434,7 @@ def visualize_scenario_indp(initial_state,h_print,r_explore,UAV_fire_extinguish)
 ##### Create initial population of samples #####
 
 n_hidd = 50
-n_init_pool = 100000
+n_init_pool = 100000#50000
 
 outcome = samples_by_random_action(n_init_pool,[0,15,1,1,1],UAV_fire_extinguish)
 
@@ -555,7 +552,7 @@ h_train_step = 1000
 h_grad = 100
 r_explore = 0.4
 
-for iteration_times in range(5):
+for iteration_times in range(0):
   print("iteration times = ", iteration_times)
   print("--- %s seconds ---" % (time.time() - start_time))
   ##############################
@@ -602,7 +599,7 @@ for iteration_times in range(5):
     next_state = outcome_transition[0]
     (next_info_0,reward_immed) = outcome_transition[1]
     (next_info_1,reward_immed) = outcome_transition[2]
-    if h%50 == 0: print(h,numeric_loss_a0)
+    if h%50 == 0: print(numeric_loss_a0)
     #print('(current_state)= ',current_state)
     #print('(joint action )= ',(action_chosen_0,action_chosen_1))
     #print('(next state   )= ',next_state)
@@ -709,7 +706,7 @@ for iteration_times in range(5):
     (next_info_0,reward_immed) = outcome_transition[1]
     (next_info_1,reward_immed) = outcome_transition[2]
 
-    if h%50 == 0: print(h,numeric_loss_a1)
+    if h%50 == 0: print(numeric_loss_a1)
     #print('(current_state)= ',current_state)
     #print('(joint action )= ',(action_chosen_0,action_chosen_1))
     #print('(next state   )= ',next_state)

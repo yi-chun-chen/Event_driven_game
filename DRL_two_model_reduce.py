@@ -7,7 +7,7 @@ class UAV_fire_extinguish(object):
   n_w = 4
   n_uav = 2
   n_fire = 1
-  u_loca = (0,15)
+  u_loca = (0,16)
   t_fail = (0.0,0.0)
   t_emit = (1.0,0.5)
   l_fire = [12]
@@ -366,10 +366,10 @@ def batch_select(inputs,n_total,n_batch,seeds):
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-n_hidd = 20
-n_init_pool = 10000
+n_hidd = 50
+n_init_pool = 5000
 
-outcome = samples_by_random_action(n_init_pool,[12,15,1])
+outcome = samples_by_random_action(n_init_pool,[0,16,1])
 
 s0_array = outcome[0]
 a0_array = outcome[1]
@@ -409,7 +409,7 @@ sess = tf.Session()
 sess.run(init)
 
 ### initialize all information ###
-current_state = [0,15,1]
+current_state = [0,16,1]
 next_state = 0
 last_info_0 = [0,0,1,1]
 
@@ -419,7 +419,7 @@ W2_for_feed_train = np.ones((n_hidd,5),float)
 b2_for_feed_train = np.ones((1,5),float)
 
 ### batch ###
-n_batch_size = 500
+n_batch_size = 1000
 
 seeds = random.sample(xrange(1,n_init_pool),n_batch_size)
 
@@ -433,7 +433,7 @@ sp0_batch = batch_select(sp0_array,n_init_pool,n_batch_size,seeds)
 
 ## +++++++++++++++++++
 
-h_train_step = 1000
+h_train_step = 10000
 h_grad = 100
 r_explore = 0.2
 
@@ -454,11 +454,7 @@ for h in range(h_train_step):
                                                             W2_train:W2_for_feed_train,
                                                             b2_train:b2_for_feed_train})
 
-    #s_show = sess.run(last_info,feed_dict = {last_info: s0_batch})
-    #r_show = sess.run(rewards,feed_dict = {rewards: r0_batch})
-    #print(s_show)
-    #print(r_show)
-    #raw_input()
+
   print(numeric_loss)
 
   action_chosen_0 = es_greedy(sess.run(Q, feed_dict={last_info: [last_info_0]}),r_explore)
@@ -471,23 +467,23 @@ for h in range(h_train_step):
   (next_info_0,reward_immed) = outcome_transition[1]
 
   print('(iter_t, h    )= ',h)
-  #print('(current_state)= ',current_state)
-  #print('(joint action )= ',action_chosen_0)
-  #print('(next state   )= ',next_state)
+  print('(current_state)= ',current_state)
+  print('(joint action )= ',action_chosen_0)
+  print('(next state   )= ',next_state)
 
   ##### increase sample dataset #####
 
-  #s0_array = np.vstack([s0_array, last_info_0])
-  #sp0_array = np.vstack([sp0_array, next_info_0])
-  #r0_array = np.vstack([r0_array, reward_immed])
+  s0_array = np.vstack([s0_array, last_info_0])
+  sp0_array = np.vstack([sp0_array, next_info_0])
+  r0_array = np.vstack([r0_array, reward_immed])
 
-  #action_new_0 = np.zeros((1,5),float)
-  #action_new_0[0,action_chosen_0] = 1.0
-  #a0_array = np.vstack([a0_array, action_new_0])
+  action_new_0 = np.zeros((1,5),float)
+  action_new_0[0,action_chosen_0] = 1.0
+  a0_array = np.vstack([a0_array, action_new_0])
 
   ##### update the train network #####
 
-  if h%100 == 0:
+  if h%50 == 0:
     W1_for_feed_train = sess.run(layer_1[1], feed_dict={last_info: [last_info_0]})
     b1_for_feed_train = sess.run(layer_1[2], feed_dict={last_info: [last_info_0]})
     W2_for_feed_train = sess.run(layer_out[1], feed_dict={last_info: [last_info_0]})
